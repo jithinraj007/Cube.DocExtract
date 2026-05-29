@@ -1,0 +1,209 @@
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>File Extracter — Document Processing Dashboard</title>
+
+    <!-- CSS and Font Resources -->
+    <link rel="stylesheet" href="~/css/minimal-theme.css" asp-append-version="true" />
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- 1. Brand Header -->
+        <header>
+            <div class="brand-container">
+                <div class="logo-glow">📄</div>
+                <div class="brand-text">
+                    <h1>File Extracter</h1>
+
+                </div>
+            </div>
+            
+        </header>
+
+        <!-- 2. Analytics segment -->
+        <div class="analytics-grid">
+            <div class="stat-card total">
+                <div class="stat-info">
+                    <h3>Total Uploaded</h3>
+                    <div class="stat-value" id="statTotal">0</div>
+                </div>
+                <div class="stat-icon">📂</div>
+            </div>
+            <div class="stat-card completed">
+                <div class="stat-info">
+                    <h3>Processed Success</h3>
+                    <div class="stat-value" id="statCompleted">0</div>
+                </div>
+                <div class="stat-icon">✅</div>
+            </div>
+            <div class="stat-card pending">
+                <div class="stat-info">
+                    <h3>In Pipeline</h3>
+                    <div class="stat-value" id="statPending">0</div>
+                </div>
+                <div class="stat-icon">⏳</div>
+            </div>
+            <div class="stat-card failed">
+                <div class="stat-info">
+                    <h3>Failed Extraction</h3>
+                    <div class="stat-value" id="statFailed">0</div>
+                </div>
+                <div class="stat-icon">⚠️</div>
+            </div>
+        </div>
+
+        <!-- 3. Main Operational segment -->
+        <div class="main-grid">
+            <!-- Sidebar: Uploads -->
+            <div class="upload-panel">
+                <div class="glass-card">
+                    <h2 class="card-title"><span>📥</span> Upload Document</h2>
+                    <div class="dropzone" id="dropzone">
+                        <div class="dropzone-icon">📤</div>
+                        <p>Drag and drop files here, or click to browse</p>
+                        <input type="file" id="fileInput" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls" multiple />
+                    </div>
+                </div>
+
+                <div class="glass-card">
+                    <h2 class="card-title"><span>🔄</span> Processing Pipeline</h2>
+                    <div class="queue-list" id="queueList">
+                        <!-- Polling and progress bars will dynamically load here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- List segment -->
+            <div class="list-panel">
+                <div class="glass-card" style="flex: 1; display:flex; flex-direction:column; gap: 1rem;">
+                    <div class="action-bar">
+                        <div class="search-box">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="searchInput" placeholder="Search by file name, PO number, status..." />
+                        </div>
+
+                        <!-- Bulk Actions -->
+                        <div class="bulk-actions" id="bulkActions" style="display:none; align-items:center; gap: 1rem;">
+                            <span style="font-size:0.85rem; font-weight:600; color:var(--text-secondary);">
+                                Selected <span id="selectedCount" style="color:#00f2fe; font-weight:700;">0</span> item(s)
+                            </span>
+                            <button class="btn-secondary" onclick="triggerExport('excel')">📊 Export to Excel</button>
+                            <button class="btn-secondary" onclick="triggerExport('csv')">📄 Export CSV (ZIP)</button>
+                            <button class="btn-secondary" onclick="triggerExport('json')">🌐 Export JSON</button>
+                            <button class="btn-danger" onclick="deleteSelected()">🗑️ Delete</button>
+                            <button class="btn-secondary" onclick="clearSelections()" style="padding:0.6rem;">✕ Clear</button>
+                        </div>
+                    </div>
+
+                    <!-- Main Grid Table -->
+                    <div class="table-container">
+                        <table class="doc-table">
+                            <thead>
+                                <tr>
+                                    <th class="checkbox-col"></th>
+                                    <th>File Name</th>
+                                    <th>Detected Type</th>
+                                    <th>Status</th>
+                                    <th>PO Number</th>
+                                    <th>Vendor</th>
+                                    <th>Date</th>
+                                    <th>Delivery Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="docTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+    <div class="drawer" id="drawer">
+        <div class="drawer-header">
+            <div class="drawer-title">
+                <h2 id="paneTitleFile">Document Extraction Explorer</h2>
+                <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.2rem;">Verify, correct, and save metadata back to SQL database.</p>
+            </div>
+            <button class="btn-close-drawer" id="btnCloseDrawer">&times;</button>
+        </div>
+
+        <form id="drawerForm" class="drawer-body">
+            <input type="hidden" id="currentDocId" />
+            
+            <!-- Left Pane: Source Document Reader -->
+            <div class="drawer-pane">
+                <h3 class="pane-title"><span>👁️</span> Source Document Extract</h3>
+                <div class="raw-text-viewer" id="rawTextViewer">
+                    <!-- Extracted digital OCR strings will display here -->
+                </div>
+            </div>
+
+            <div class="drawer-pane" style="background: rgba(12, 8, 30, 0.25);">
+                <h3 class="pane-title"><span>✍️</span> Extracted Data Fields</h3>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="editPoNumber">PO Number</label>
+                        <input type="text" id="editPoNumber" placeholder="Purchase Order Number" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editPoDate">Order Date</label>
+                        <input type="date" id="editPoDate" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editDeliveryDate">Delivery Date</label>
+                        <input type="date" id="editDeliveryDate" />
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="editVendorDetails">Vendor Details</label>
+                        <textarea id="editVendorDetails" rows="2" placeholder="Supplier Name, Address, Contact..."></textarea>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="editDeliverTo">Deliver To</label>
+                        <textarea id="editDeliverTo" rows="2" placeholder="Recipient Details, Ship Address..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Line Items Editor -->
+                <div class="line-items-editor-container">
+                    <div class="line-item-header-row">
+                        <h4 style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">Detailed Line Items</h4>
+                        <button type="button" class="btn-secondary" id="btnAddLineItem" style="padding:0.4rem 0.8rem; font-size:0.75rem;">➕ Add Item</button>
+                    </div>
+
+                    <div class="line-items-list" id="lineItemsList">
+                        <!-- Line item editors will dynamically insert here -->
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div class="drawer-footer">
+            <button type="button" class="btn-secondary" onclick="document.getElementById('btnCloseDrawer').click()">Cancel</button>
+            <button type="submit" form="drawerForm" class="btn-primary">💾 Verify & Save Changes</button>
+        </div>
+    </div>
+
+    <!-- Hidden form for triggering file downloads -->
+    <form id="exportForm" action="/api/document/export" method="POST" style="display:none;">
+        <input type="hidden" name="format" id="exportFormat" />
+        <input type="hidden" name="ids" id="exportIds" />
+    </form>
+
+    <!-- JS Scripts -->
+    <script src="~/js/dashboard.js" asp-append-version="true"></script>
+</body>
+</html>
