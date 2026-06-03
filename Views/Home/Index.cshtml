@@ -42,13 +42,13 @@
                 </div>
                 <div class="stat-icon">✅</div>
             </div>
-            <div class="stat-card pending">
+@*             <div class="stat-card pending">
                 <div class="stat-info">
                     <h3>In Pipeline</h3>
                     <div class="stat-value" id="statPending">0</div>
                 </div>
                 <div class="stat-icon">⏳</div>
-            </div>
+            </div> *@
             <div class="stat-card failed">
                 <div class="stat-info">
                     <h3>Failed Extraction</h3>
@@ -127,75 +127,6 @@
     </div>
 
     <div class="drawer-backdrop" id="drawerBackdrop"></div>
-    <div class="drawer" id="drawer">
-        <div class="drawer-header">
-            <div class="drawer-title">
-                <h2 id="paneTitleFile">Document Extraction Explorer</h2>
-                <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.2rem;">Verify, correct, and save metadata back to SQL database.</p>
-            </div>
-            <button class="btn-close-drawer" id="btnCloseDrawer">&times;</button>
-        </div>
-
-        <form id="drawerForm" class="drawer-body">
-            <input type="hidden" id="currentDocId" />
-            
-            <!-- Left Pane: Source Document Reader -->
-            <div class="drawer-pane">
-                <h3 class="pane-title"><span>👁️</span> Source Document Extract</h3>
-                <div class="raw-text-viewer" id="rawTextViewer">
-                    <!-- Extracted digital OCR strings will display here -->
-                </div>
-            </div>
-
-            <div class="drawer-pane" style="background: rgba(12, 8, 30, 0.25);">
-                <h3 class="pane-title"><span>✍️</span> Extracted Data Fields</h3>
-                
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="editPoNumber">PO Number</label>
-                        <input type="text" id="editPoNumber" placeholder="Purchase Order Number" />
-                    </div>
-
-                    <div class="form-group">
-                        <label for="editPoDate">Order Date</label>
-                        <input type="date" id="editPoDate" />
-                    </div>
-
-                    <div class="form-group">
-                        <label for="editDeliveryDate">Delivery Date</label>
-                        <input type="date" id="editDeliveryDate" />
-                    </div>
-
-                    <div class="form-group full-width">
-                        <label for="editVendorDetails">Vendor Details</label>
-                        <textarea id="editVendorDetails" rows="2" placeholder="Supplier Name, Address, Contact..."></textarea>
-                    </div>
-
-                    <div class="form-group full-width">
-                        <label for="editDeliverTo">Deliver To</label>
-                        <textarea id="editDeliverTo" rows="2" placeholder="Recipient Details, Ship Address..."></textarea>
-                    </div>
-                </div>
-
-                <!-- Line Items Editor -->
-                <div class="line-items-editor-container">
-                    <div class="line-item-header-row">
-                        <h4 style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">Detailed Line Items</h4>
-                        <button type="button" class="btn-secondary" id="btnAddLineItem" style="padding:0.4rem 0.8rem; font-size:0.75rem;">➕ Add Item</button>
-                    </div>
-
-                    <div class="line-items-list" id="lineItemsList">
-                        <!-- Line item editors will dynamically insert here -->
-                    </div>
-                </div>
-            </div>
-        </form>
-
-        <div class="drawer-footer">
-            <button type="button" class="btn-secondary" onclick="document.getElementById('btnCloseDrawer').click()">Cancel</button>
-            <button type="submit" form="drawerForm" class="btn-primary">💾 Verify & Save Changes</button>
-        </div>
-    </div>
 
     <!-- Hidden form for triggering file downloads -->
     <form id="exportForm" action="/api/document/export" method="POST" style="display:none;">

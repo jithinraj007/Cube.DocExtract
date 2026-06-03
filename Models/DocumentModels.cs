@@ -77,6 +77,12 @@ namespace TaskOne.Models
         [JsonIgnore]
         public virtual UploadedDocument? Document { get; set; }
 
+        public int? MetadataId { get; set; }
+
+        [ForeignKey("MetadataId")]
+        [JsonIgnore]
+        public virtual DocumentMetadata? Metadata { get; set; }
+
         [StringLength(100)]
         public string? PoNumber { get; set; }
 

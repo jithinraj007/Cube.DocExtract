@@ -61,12 +61,14 @@ namespace TaskOne.Controllers
                     .Include(d => d.LineItems)
                     .OrderByDescending(d => d.UploadDate)
                     .ToListAsync();
+
+                _logger.LogInformation("Successfully retrieved {Count} documents from database", docs.Count);
                 return Ok(docs);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error listing documents.");
-                return StatusCode(500, new { message = "Error loading documents from database." });
+                _logger.LogError(ex, "Error listing documents. Exception: {ExceptionMessage}", ex.Message);
+                return StatusCode(500, new { message = "Error loading documents from database.", error = ex.Message });
             }
         }
 
@@ -191,11 +193,17 @@ namespace TaskOne.Controllers
                 {
                     metadata.DocumentId = documentId;
                     db.DocumentMetadata.Add(metadata);
+                    await db.SaveChangesAsync();  // ✅ Save metadata first to get the ID
                 }
 
+                // Now link line items to both document and metadata
                 foreach (var item in lineItems)
                 {
                     item.DocumentId = documentId;
+                    if (metadata != null)
+                    {
+                        item.MetadataId = metadata.Id;  // ✅ Link to metadata
+                    }
                     db.LineItems.Add(item);
                 }
 
@@ -204,7 +212,7 @@ namespace TaskOne.Controllers
                 doc.RawText = rawText;
                 doc.Status = DocumentStatus.Completed;
 
-                await db.SaveChangesAsync();
+                await db.SaveChangesAsync();  // ✅ Final save with all data
                 logger.LogInformation("Successfully completed processing document ID {Id} in {Ms}ms", documentId, doc.ProcessingTimeMs);
             }
             catch (Exception ex)

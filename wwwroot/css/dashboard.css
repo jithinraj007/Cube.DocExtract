@@ -798,9 +798,91 @@ table.doc-table tbody tr.selected {
     opacity: 0.4;
 }
 
+
 .empty-state h3 {
     margin-bottom: 0.5rem;
     color: var(--text-primary);
+}
+
+/* Line Items Table */
+.line-items-table-container {
+    margin-top: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    overflow-x: auto;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.line-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.line-items-table thead {
+    background: rgba(79, 172, 254, 0.1);
+    border-bottom: 2px solid rgba(79, 172, 254, 0.3);
+}
+
+.line-items-table thead th {
+    padding: 1rem 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    color: #00f2fe;
+    white-space: nowrap;
+}
+
+.line-items-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background-color 0.2s ease;
+}
+
+.line-items-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.line-items-table tbody td {
+    padding: 0.75rem;
+    vertical-align: middle;
+    color: var(--text-primary);
+}
+
+.line-items-table .item-number {
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-secondary);
+    width: 40px;
+}
+
+.line-items-table .item-desc input {
+    width: 100%;
+}
+
+.line-items-table .item-qty input,
+.line-items-table .item-rate input,
+.line-items-table .item-tax-pct input,
+.line-items-table .item-tax-amt input,
+.line-items-table .item-amt input {
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+.line-items-table .item-actions {
+    text-align: center;
+    width: 60px;
+}
+
+.line-items-table .btn-remove-item {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.4rem 0.6rem;
+    transition: transform 0.2s ease;
+}
+
+.line-items-table .btn-remove-item:hover {
+    transform: scale(1.2);
 }
 
 /* Custom Scrollbar */

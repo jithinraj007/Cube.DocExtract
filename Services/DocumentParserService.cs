@@ -113,7 +113,7 @@ namespace TaskOne.Services
         {
             _logger.LogInformation("Starting ExtractPoDate");
             // First try keyword-based extraction with specific keywords
-            var poDateKeywords = new[] { "po date", "order date", "issue date", "date :", "dated :" };
+            var poDateKeywords = new[] { "po date", "order date", "issue date", "date :", "date:", "dated :", "dated:", "date of order", "order placed", "po date:" };
             var result = ExtractDateWithProximity(lines, poDateKeywords);
             if (result.HasValue)
             {
@@ -131,11 +131,19 @@ namespace TaskOne.Services
                 return result;
             }
 
-            // Third try: Extract FIRST date found anywhere in first 25 lines
-            result = ExtractFirstDateInRange(lines, 0, Math.Min(25, lines.Length));
+            // Third try: Extract FIRST date found anywhere in first 30 lines (increased from 25)
+            result = ExtractFirstDateInRange(lines, 0, Math.Min(30, lines.Length));
             if (result.HasValue)
             {
-                _logger.LogInformation("Extracted PO Date from first 25 lines: {Date}", result.Value);
+                _logger.LogInformation("Extracted PO Date from first 30 lines: {Date}", result.Value);
+                return result;
+            }
+
+            // Fourth try: Search ENTIRE document for ANY valid date and return the earliest one (most likely PO date)
+            result = ExtractFirstValidDateInEntireDocument(lines);
+            if (result.HasValue)
+            {
+                _logger.LogInformation("Extracted PO Date as first valid date in entire document: {Date}", result.Value);
                 return result;
             }
 
@@ -146,7 +154,7 @@ namespace TaskOne.Services
         private DateTime? ExtractDeliveryDate(string[] lines)
         {
             _logger.LogInformation("Starting ExtractDeliveryDate");
-            var deliveryKeywords = new[] { "delivery date", "due date", "deliver by", "ship date", "delivery:", "delivery date :" };
+            var deliveryKeywords = new[] { "delivery date", "due date", "deliver by", "ship date", "delivery:", "delivery date :", "required by", "expected delivery", "arrival date" };
             var result = ExtractDateWithProximity(lines, deliveryKeywords);
             if (result.HasValue)
             {
@@ -180,6 +188,14 @@ namespace TaskOne.Services
                         }
                     }
                 }
+            }
+
+            // Fallback 3: Search entire document for SECOND valid date
+            result = ExtractNthValidDateInEntireDocument(lines, 2);
+            if (result.HasValue)
+            {
+                _logger.LogInformation("Extracted Delivery Date as second valid date in entire document: {Date}", result.Value);
+                return result;
             }
 
             _logger.LogWarning("Could not extract any delivery date");
@@ -267,7 +283,11 @@ namespace TaskOne.Services
             for (int i = 0; i < lines.Length; i++)
             {
                 string lineLower = lines[i].ToLowerInvariant();
-                if (keywords.Any(kw => lineLower.Contains(kw)))
+
+                // Normalize the line by collapsing multiple spaces
+                string normalizedLine = System.Text.RegularExpressions.Regex.Replace(lineLower, @"\s+", " ").Trim();
+
+                if (keywords.Any(kw => normalizedLine.Contains(kw)))
                 {
                     // Check same line first
                     var match = dateRegex.Match(lines[i]);
@@ -281,8 +301,8 @@ namespace TaskOne.Services
                         }
                     }
 
-                    // Check next 3 lines for date
-                    for (int offset = 1; offset <= 3 && (i + offset) < lines.Length; offset++)
+                    // Check next 5 lines for date (increased from 3)
+                    for (int offset = 1; offset <= 5 && (i + offset) < lines.Length; offset++)
                     {
                         var nextLineMatch = dateRegex.Match(lines[i + offset]);
                         if (nextLineMatch.Success)
@@ -294,6 +314,27 @@ namespace TaskOne.Services
                                 return extractedDate;
                             }
                         }
+                    }
+                }
+            }
+
+            // Second pass: Look for patterns like "Date : " where date is on same line after colon
+            var dateAfterColonRegex = new Regex(
+                @"(?:date|delivery date|ship date|delivery)[:\s]*([0-3]?\d\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}|[0-3]?\d[/\.-][0-1]?\d[/\.-]\d{2,4})",
+                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var match = dateAfterColonRegex.Match(lines[i]);
+                if (match.Success)
+                {
+                    // Extract the captured date part (group 1)
+                    string dateStr = match.Groups[1].Value.Trim();
+                    extractedDate = TryParseDate(dateStr);
+                    if (extractedDate.HasValue && IsValidBusinessDate(extractedDate.Value))
+                    {
+                        _logger.LogInformation("Extracted date after colon from line: {Date}", extractedDate.Value);
+                        return extractedDate;
                     }
                 }
             }
@@ -335,13 +376,20 @@ namespace TaskOne.Services
                 "yyyy-MM-dd",   // 2025-03-01
                 "yyyy.MM.dd",   // 2025.03.01
                 "dd MMM yyyy",  // 01 Mar 2025
+                "d MMM yyyy",   // 1 Mar 2025
                 "dd MMMM yyyy", // 01 March 2025
+                "d MMMM yyyy",  // 1 March 2025
                 "MMM dd, yyyy", // Mar 01, 2025
+                "MMM d, yyyy",  // Mar 1, 2025
                 "MMM dd yyyy",  // Mar 01 2025
+                "MMM d yyyy",   // Mar 1 2025
                 "MMMM dd, yyyy", // March 01, 2025
+                "MMMM d, yyyy",  // March 1, 2025
                 "MMMM dd yyyy",  // March 01 2025
+                "MMMM d yyyy",   // March 1 2025
                 "dd/MM/yy",     // 01/03/25
                 "MM/dd/yyyy",   // 03/01/2025 (US format)
+                "M/dd/yyyy",    // 3/01/2025 (US format)
                 "MM/dd/yy",     // 03/01/25 (US format)
             };
 
@@ -369,6 +417,69 @@ namespace TaskOne.Services
         private bool IsValidBusinessDate(DateTime date)
         {
             return date.Year >= 2000 && date.Year <= 2050;
+        }
+
+        /// <summary>
+        /// Search entire document for the first valid date found
+        /// </summary>
+        private DateTime? ExtractFirstValidDateInEntireDocument(string[] lines)
+        {
+            var dateRegex = new Regex(
+                @"\b(" +
+                @"\d{1,2}[/\.-]\d{1,2}[/\.-]\d{2,4}|" +
+                @"\d{4}[/\.-]\d{1,2}[/\.-]\d{1,2}|" +
+                @"\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}|" +
+                @"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}" +
+                @")\b", 
+                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var matches = dateRegex.Matches(lines[i]);
+                foreach (Match match in matches)
+                {
+                    var parsed = TryParseDate(match.Value);
+                    if (parsed.HasValue && IsValidBusinessDate(parsed.Value))
+                    {
+                        return parsed;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Search entire document for the Nth valid date found
+        /// </summary>
+        private DateTime? ExtractNthValidDateInEntireDocument(string[] lines, int nthDate)
+        {
+            var dateRegex = new Regex(
+                @"\b(" +
+                @"\d{1,2}[/\.-]\d{1,2}[/\.-]\d{2,4}|" +
+                @"\d{4}[/\.-]\d{1,2}[/\.-]\d{1,2}|" +
+                @"\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}|" +
+                @"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}" +
+                @")\b", 
+                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+            int dateCount = 0;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var matches = dateRegex.Matches(lines[i]);
+                foreach (Match match in matches)
+                {
+                    var parsed = TryParseDate(match.Value);
+                    if (parsed.HasValue && IsValidBusinessDate(parsed.Value))
+                    {
+                        dateCount++;
+                        if (dateCount == nthDate)
+                        {
+                            return parsed;
+                        }
+                    }
+                }
+            }
+            return null;
         }
 
 

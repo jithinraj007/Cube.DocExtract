@@ -29,6 +29,12 @@ namespace TaskOne.Models
                 .WithOne(l => l.Document)
                 .HasForeignKey(l => l.DocumentId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<LineItem>()
+                .HasOne(l => l.Metadata)
+                .WithMany()
+                .HasForeignKey(l => l.MetadataId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

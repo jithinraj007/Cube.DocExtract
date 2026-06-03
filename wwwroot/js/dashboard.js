@@ -427,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Line Items Editor
         lineItemsList.innerHTML = '';
         if (doc.lineItems && doc.lineItems.length > 0) {
-            doc.lineItems.forEach(item => addLineItemRow(item));
+            doc.lineItems.forEach((item, index) => addLineItemRow(item, index + 1));
         }
 
         // Open Drawer View
@@ -444,30 +444,33 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCloseDrawer.addEventListener('click', closeDrawer);
     drawerBackdrop.addEventListener('click', closeDrawer);
 
-    // 9. Add Line Item Row in UI editor
-    function addLineItemRow(item = {}) {
-        const row = document.createElement('div');
+    // 9. Add Line Item Row in UI editor (as table row)
+    function addLineItemRow(item = {}, itemNumber = 1) {
+        const row = document.createElement('tr');
         row.className = 'line-item-row';
         row.innerHTML = `
-            <div class="form-group item-desc">
-                <input type="text" class="field-item-desc" placeholder="Item Name/Details" value="${escapeHtml(item.item || '')}" required>
-            </div>
-            <div class="form-group item-qty">
-                <input type="number" step="any" class="field-qty" placeholder="Qty" value="${item.quantity || ''}" required>
-            </div>
-            <div class="form-group item-rate">
-                <input type="number" step="any" class="field-rate" placeholder="Rate" value="${item.rate || ''}" required>
-            </div>
-            <div class="form-group item-tax-pct">
-                <input type="number" step="any" class="field-tax-pct" placeholder="Tax %" value="${item.taxPercent || ''}">
-            </div>
-            <div class="form-group item-tax-amt">
-                <input type="number" step="any" class="field-tax-amt" placeholder="Tax Amt" value="${item.taxAmount || ''}" readonly>
-            </div>
-            <div class="form-group item-amt">
-                <input type="number" step="any" class="field-amt" placeholder="Total" value="${item.amount || ''}" required>
-            </div>
-            <button type="button" class="btn-remove-item" onclick="this.parentElement.remove()">🗑️</button>
+            <td class="item-number">${itemNumber}</td>
+            <td class="item-desc">
+                <input type="text" class="field-item-desc" placeholder="Item Name/Details" value="${escapeHtml(item.item || '')}" style="width:100%; padding: 0.4rem; border: 1px solid var(--text-secondary); border-radius: 4px;">
+            </td>
+            <td class="item-qty">
+                <input type="number" step="any" class="field-qty" placeholder="Qty" value="${item.quantity || ''}" style="width:100%; padding: 0.4rem; border: 1px solid var(--text-secondary); border-radius: 4px;">
+            </td>
+            <td class="item-rate">
+                <input type="number" step="any" class="field-rate" placeholder="Rate" value="${item.rate || ''}" style="width:100%; padding: 0.4rem; border: 1px solid var(--text-secondary); border-radius: 4px;">
+            </td>
+            <td class="item-tax-pct">
+                <input type="number" step="any" class="field-tax-pct" placeholder="Tax %" value="${item.taxPercent || ''}" style="width:100%; padding: 0.4rem; border: 1px solid var(--text-secondary); border-radius: 4px;">
+            </td>
+            <td class="item-tax-amt">
+                <input type="number" step="any" class="field-tax-amt" placeholder="Tax Amt" value="${item.taxAmount || ''}" style="width:100%; padding: 0.4rem; background-color: var(--bg-secondary); border: 1px solid var(--text-secondary); border-radius: 4px;" readonly>
+            </td>
+            <td class="item-amt">
+                <input type="number" step="any" class="field-amt" placeholder="Total" value="${item.amount || ''}" style="width:100%; padding: 0.4rem; border: 1px solid var(--text-secondary); border-radius: 4px;">
+            </td>
+            <td class="item-actions">
+                <button type="button" class="btn-remove-item" title="Delete this item" onclick="this.parentElement.parentElement.remove()">🗑️</button>
+            </td>
         `;
 
         lineItemsList.appendChild(row);
