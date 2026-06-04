@@ -487,6 +487,19 @@ namespace TaskOne.Services
         {
             var vendorKeywords = new[] { "vendor", "vendor address", "vendor details", "supplier", "from:", "sold by", "invoice from", "vendor name" };
             var result = ExtractAddressBlock(lines, vendorKeywords, defaultSearchStart: 0, defaultSearchEnd: 15);
+            result = Regex.Replace(
+    result,
+    @"(?i)^vendor\s*address\s*",
+    ""
+).Trim();
+            int deliverToIndex = result.IndexOf(
+    "Deliver To",
+    StringComparison.OrdinalIgnoreCase);
+
+            if (deliverToIndex >= 0)
+            {
+                result = result.Substring(0, deliverToIndex).Trim();
+            }
             if (!string.IsNullOrWhiteSpace(result))
             {
                 _logger.LogInformation("Extracted Vendor Details: {Vendor}", result);
@@ -499,6 +512,11 @@ namespace TaskOne.Services
         {
             var deliverKeywords = new[] { "deliver to", "ship to", "delivery address", "delivery to", "recipient", "bill to", "invoice to", "deliver-to" };
             var result = ExtractAddressBlock(lines, deliverKeywords, defaultSearchStart: 5, defaultSearchEnd: 25);
+            result = Regex.Replace(
+    result,
+    @"(?is)#?\s*Item\s*&?\s*Description.*$",
+    ""
+).Trim();
             if (!string.IsNullOrWhiteSpace(result))
             {
                 _logger.LogInformation("Extracted Deliver To: {DeliverTo}", result);
@@ -593,178 +611,62 @@ namespace TaskOne.Services
         private List<LineItem> ExtractLineItemsFromText(string[] lines, string? poNumber)
         {
             var lineItems = new List<LineItem>();
-            int headerIdx = -1;
 
-            // Search for table headers
-            var headerKeywords = new[] { "item", "description", "qty", "quantity", "rate", "price", "amount", "total" };
-            for (int i = 0; i < lines.Length; i++)
+            string fullText = string.Join("", lines);
+
+            int startIndex = fullText.IndexOf("#Item & Description",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (startIndex < 0)
+                return lineItems;
+
+            string tableText = fullText.Substring(startIndex);
+
+            // Remove header
+            tableText = Regex.Replace(
+                tableText,
+                @"(?i)#?\s*Item\s*&\s*Description\s*Qty\s*Rate\s*Tax\s*%?\s*Tax\s*Amount",
+                "");
+
+            var regex = new Regex(
+                @"(\d+)" +                        // Row Number
+                @"([A-Za-z\s\(\)]+?)" +           // Description
+                @"(\d+\.\d{2})" +                 // Qty
+                @"(\d+\.\d{2})" +                 // Rate
+                @"(\d+\.\d{2})" +                 // Tax %
+                @"(\d+\.\d{2})" +                 // Tax
+                @"(\d+\.\d{2})",                  // Amount
+                RegexOptions.Compiled);
+
+            foreach (Match match in regex.Matches(tableText))
             {
-                string lineLower = lines[i].ToLowerInvariant();
-                int matchCount = headerKeywords.Count(kw => lineLower.Contains(kw));
-                if (matchCount >= 2 && (lineLower.Contains("qty") || lineLower.Contains("quantity") || lineLower.Contains("amount")))
+                try
                 {
-                    headerIdx = i;
-                    _logger.LogInformation("Detected table header at line {Idx}: {Content}", i, lines[i]);
-                    break;
-                }
-            }
-
-            if (headerIdx == -1)
-            {
-                // Fallback: look for a row with multiple numeric fields that sum up
-                headerIdx = 10; // Default start
-            }
-
-            // Process lines below the header
-            for (int i = headerIdx + 1; i < lines.Length; i++)
-            {
-                string line = lines[i];
-
-                // Stop conditions
-                string lineLower = line.ToLowerInvariant();
-                if (lineLower.Contains("subtotal") || lineLower.Contains("grand total") || lineLower.Contains("total due") || lineLower.Contains("tax summary") || lineLower.Contains("payment terms"))
-                {
-                    _logger.LogInformation("Reached table boundary at line {Idx}: {Content}", i, line);
-                    break;
-                }
-
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                // Match decimal numbers in the line
-                // Matches negative or positive numbers with optional decimals
-                var numberRegex = new Regex(@"-?\b\d+(?:,\d{3})*(?:\.\d+)?\b", RegexOptions.Compiled);
-                var matches = numberRegex.Matches(line);
-
-                if (matches.Count >= 2)
-                {
-                    // Parse all decimal values
-                    var values = new List<decimal>();
-                    foreach (Match match in matches)
+                    var item = new LineItem
                     {
-                        if (decimal.TryParse(match.Value.Replace(",", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal val))
-                        {
-                            values.Add(val);
-                        }
-                    }
+                        PoNumber = poNumber,
+                        Item = match.Groups[2].Value.Trim(),
+                        Quantity = decimal.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture),
+                        Rate = decimal.Parse(match.Groups[4].Value, CultureInfo.InvariantCulture),
+                        TaxPercent = decimal.Parse(match.Groups[5].Value, CultureInfo.InvariantCulture),
+                        TaxAmount = decimal.Parse(match.Groups[6].Value, CultureInfo.InvariantCulture),
+                        Amount = decimal.Parse(match.Groups[7].Value, CultureInfo.InvariantCulture)
+                    };
 
-                    if (values.Count >= 2)
-                    {
-                        // Identify Description (everything before the first number)
-                        string firstNumStr = matches[0].Value;
-                        int numStartIdx = line.IndexOf(firstNumStr);
-                        string description = numStartIdx > 0 ? line.Substring(0, numStartIdx).Trim(' ', '-', '.', '\t', ',') : "Line Item";
+                    lineItems.Add(item);
 
-                        if (string.IsNullOrWhiteSpace(description) || description.Length < 2)
-                        {
-                            description = "Item Details";
-                        }
-
-                        var item = new LineItem
-                        {
-                            PoNumber = poNumber,
-                            Item = description
-                        };
-
-                        // Mathematical heuristics to assign values:
-                        // Typical formats:
-                        // 1. Qty, Rate, Amount
-                        // 2. Qty, Rate, Tax%, Tax, Amount
-                        // 3. ItemNo, Qty, Rate, Amount
-                        
-                        bool parsed = false;
-
-                        // Try to find if Qty * Rate = Amount (or close)
-                        // Let's test combinations
-                        for (int q = 0; q < values.Count; q++)
-                        {
-                            for (int r = 0; r < values.Count; r++)
-                            {
-                                if (q == r) continue;
-                                for (int a = 0; a < values.Count; a++)
-                                {
-                                    if (a == q || a == r) continue;
-
-                                    decimal qty = values[q];
-                                    decimal rate = values[r];
-                                    decimal amt = values[a];
-
-                                    // Simple multiplication check
-                                    if (qty > 0 && rate > 0 && Math.Abs((qty * rate) - amt) < 0.05m)
-                                    {
-                                        item.Quantity = qty;
-                                        item.Rate = rate;
-                                        item.Amount = amt;
-
-                                        // See if we have Tax% and TaxAmount in the remaining numbers
-                                        var remaining = values.Where((v, idx) => idx != q && idx != r && idx != a).ToList();
-                                        if (remaining.Count >= 1)
-                                        {
-                                            // Proximity mapping
-                                            item.TaxAmount = remaining[0];
-                                            if (remaining.Count >= 2)
-                                            {
-                                                item.TaxPercent = remaining[1];
-                                            }
-                                        }
-
-                                        parsed = true;
-                                        break;
-                                    }
-                                }
-                                if (parsed) break;
-                            }
-                            if (parsed) break;
-                        }
-
-                        // Fallback mapping if math check failed (assume standard order: Qty, Rate, Amount)
-                        if (!parsed)
-                        {
-                            // Strip item numbers from first value if it's an integer and matches index
-                            int valStart = 0;
-                            if (values.Count >= 4 && values[0] == (lineItems.Count + 1))
-                            {
-                                valStart = 1; // Skip item index
-                            }
-
-                            if (values.Count - valStart >= 3)
-                            {
-                                item.Quantity = values[valStart];
-                                item.Rate = values[valStart + 1];
-                                item.Amount = values[valStart + 2];
-
-                                if (values.Count - valStart >= 5)
-                                {
-                                    item.TaxPercent = values[valStart + 2];
-                                    item.TaxAmount = values[valStart + 3];
-                                    item.Amount = values[valStart + 4];
-                                }
-                                parsed = true;
-                            }
-                            else if (values.Count - valStart == 2)
-                            {
-                                item.Quantity = values[valStart];
-                                item.Amount = values[valStart + 1];
-                                item.Rate = item.Quantity > 0 ? item.Amount / item.Quantity : 0;
-                                parsed = true;
-                            }
-                        }
-
-                        if (parsed && item.Quantity > 0)
-                        {
-                            // Auto calculate missing taxes
-                            if (item.TaxPercent != null && item.TaxAmount == null)
-                            {
-                                item.TaxAmount = item.Amount * (item.TaxPercent / 100);
-                            }
-                            else if (item.TaxAmount != null && item.TaxPercent == null && item.Amount > 0)
-                            {
-                                item.TaxPercent = Math.Round((item.TaxAmount.Value / item.Amount.Value) * 100, 2);
-                            }
-
-                            lineItems.Add(item);
-                            _logger.LogInformation("Parsed Line Item: {Item}, Qty: {Qty}, Rate: {Rate}, Amt: {Amt}", item.Item, item.Quantity, item.Rate, item.Amount);
-                        }
-                    }
+                    _logger.LogInformation(
+                        "Parsed Line Item: {Item}, Qty:{Qty}, Rate:{Rate}, Tax%:{TaxPercent}, Tax:{Tax}, Amount:{Amount}",
+                        item.Item,
+                        item.Quantity,
+                        item.Rate,
+                        item.TaxPercent,
+                        item.TaxAmount,
+                        item.Amount);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed parsing line item");
                 }
             }
 

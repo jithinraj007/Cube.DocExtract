@@ -128,6 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const totalAmount = doc.lineItems?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
             const formattedTotal = totalAmount > 0 ? `$${totalAmount.toFixed(2)}` : '—';
 
+            const deliverTo = doc.metadata?.deliverTo; 
+
             return `
                 <tr class="${isSelectedClass}" data-id="${doc.id}">
                     <td class="checkbox-col" onclick="event.stopPropagation();">
@@ -154,10 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                     <td onclick="openDocDrawer(${doc.id})" style="font-size:0.85rem;">${poDate}</td>
                     <td onclick="openDocDrawer(${doc.id})" style="font-size:0.85rem;">${deliveryDate}</td>
-                    <td onclick="openDocDrawer(${doc.id})" style="font-weight:700; color:#10a760;">${formattedTotal}</td>
-                    <td onclick="event.stopPropagation();">
-                        <button class="btn-table-action" onclick="triggerExportSingle(${doc.id})" title="Export this document">📥 Export</button>
-                    </td>
+                    <td onclick="openDocDrawer(${doc.id})" style="font-weight:700; color:#10a760;">${deliverTo}</td>
                 </tr>
             `;
         }).join('');
