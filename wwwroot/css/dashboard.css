@@ -925,3 +925,21 @@ table.doc-table tbody tr.selected {
     .line-items-row td {
         padding: 15px !important;
     }
+
+
+
+.expand-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: #7c3aed;
+    font-size: 24px;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+}
+
+    .expand-btn:hover {
+        transform: scale(1.15);
+    }
