@@ -629,13 +629,13 @@ namespace TaskOne.Services
                 "");
 
             var regex = new Regex(
-                @"(\d+)" +                        // Row Number
-                @"([A-Za-z\s\(\)]+?)" +           // Description
-                @"(\d+\.\d{2})" +                 // Qty
-                @"(\d+\.\d{2})" +                 // Rate
-                @"(\d+\.\d{2})" +                 // Tax %
-                @"(\d+\.\d{2})" +                 // Tax
-                @"(\d+\.\d{2})",                  // Amount
+                @"(\d+)" +                      // Row Number
+                @"([A-Za-z0-9\s\(\)\-]+?)" +    // Description (supports 500g, 1kg etc)
+                @"(\d+\.\d{2})" +               // Qty
+                @"(\d+\.\d{2})" +               // Rate
+                @"(\d+\.\d{2})" +               // Tax %
+                @"(\d+\.\d{2})" +               // Tax Amount
+                @"(\d+\.\d{2})",                // Amount
                 RegexOptions.Compiled);
 
             foreach (Match match in regex.Matches(tableText))

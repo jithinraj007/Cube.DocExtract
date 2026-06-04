@@ -131,14 +131,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const deliverTo = doc.metadata?.deliverTo; 
 
             return `
-                <tr class="${isSelectedClass}" data-id="${doc.id}">
-                    <td class="checkbox-col" onclick="event.stopPropagation();">
-                        <input type="checkbox" class="doc-checkbox" data-id="${doc.id}" ${isChecked}>
-                    </td>
-                    <td onclick="openDocDrawer(${doc.id})">
-                        <div style="font-weight:600;">${escapeHtml(doc.fileName)}</div>
-                        <div style="font-size:0.75rem; color:var(--text-secondary);">${uploadDate}</div>
-                    </td>
+    <tr class="${isSelectedClass}" data-id="${doc.id}">
+        <td>
+            <button class="expand-btn"
+                    onclick="toggleLineItems(${doc.id})">
+                ➕
+            </button>
+        </td>
+
+        <td class="checkbox-col" onclick="event.stopPropagation();">
+            <input type="checkbox"
+                   class="doc-checkbox"
+                   data-id="${doc.id}"
+                   ${isChecked}>
+        </td>
+
+        <td onclick="openDocDrawer(${doc.id})">
+            <div style="font-weight:600;">
+                ${escapeHtml(doc.fileName)}
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-secondary);">
+                ${uploadDate}
+            </div>
+        </td>
                     <td onclick="openDocDrawer(${doc.id})">
                         <span class="badge ${getFileTypeBadgeClass(doc.fileType)}">${escapeHtml(doc.fileType)}</span>
                     </td>
@@ -158,6 +173,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td onclick="openDocDrawer(${doc.id})" style="font-size:0.85rem;">${deliveryDate}</td>
                     <td onclick="openDocDrawer(${doc.id})" style="font-weight:700; color:#10a760;">${deliverTo}</td>
                 </tr>
+
+                    <tr id="lineItems-${doc.id}"
+                        class="line-items-row"
+                        style="display:none;">
+                        <td colspan="10">
+                            ${renderLineItemsTable(doc)}
+                        </td>
+                    </tr>
             `;
         }).join('');
 
@@ -189,6 +212,64 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type.includes('image')) return 'badge-image';
         return '';
     }
+
+
+    window.toggleLineItems = function (docId) {
+
+        const row = document.getElementById(`lineItems-${docId}`);
+
+        if (!row)
+            return;
+
+        row.style.display =
+            row.style.display === 'none'
+                ? 'table-row'
+                : 'none';
+    };
+
+    function renderLineItemsTable(doc) {
+
+        if (!doc.lineItems || doc.lineItems.length === 0) {
+
+            return `
+            <div style="padding:15px;">
+                No line items found.
+            </div>
+        `;
+        }
+
+        return `
+        <table class="table table-sm table-bordered"
+               style="width:100%;margin:10px 0;">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Rate</th>
+                    <th>Tax %</th>
+                    <th>Tax Amount</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+
+                ${doc.lineItems.map(item => `
+                    <tr>
+                        <td>${escapeHtml(item.item || '')}</td>
+                        <td>${item.quantity ?? ''}</td>
+                        <td>${item.rate ?? ''}</td>
+                        <td>${item.taxPercent ?? ''}</td>
+                        <td>${item.taxAmount ?? ''}</td>
+                        <td>${item.amount ?? ''}</td>
+                    </tr>
+                `).join('')}
+
+            </tbody>
+        </table>
+    `;
+    }
+
+
 
     // 4. File Upload Handler (supports multiple files)
     async function handleFileUpload(files) {
